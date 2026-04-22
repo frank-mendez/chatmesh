@@ -1,0 +1,32 @@
+# Binaries
+/server
+/testclient
+*.exe
+*.out
+
+# Build output
+dist/
+bin/
+
+# Go test artifacts
+*.test
+*.prof
+coverage.out
+coverage.html
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor / IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Docker
+docker-compose.override.yml
+
+# Env files
+.env
+.env.*
