@@ -30,3 +30,8 @@ docker-compose.override.yml
 # Env files
 .env
 .env.*
+
+# Tooling / AI config
+.agents/
+.claude/
+skills-lock.json
