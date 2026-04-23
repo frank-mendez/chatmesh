@@ -12,6 +12,7 @@ import (
 var upgrader = gorillaws.Upgrader{
 	ReadBufferSize:  1024,
 	WriteBufferSize: 1024,
+	// Phase 1: allow all origins. Tighten in a later phase.
 	CheckOrigin: func(r *http.Request) bool { return true },
 }
 

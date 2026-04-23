@@ -125,6 +125,7 @@ func (c *Client) WriteLoop() {
 		case payload, ok := <-c.send:
 			_ = c.conn.SetWriteDeadline(time.Now().Add(writeWait))
 			if !ok {
+				// Hub closed the channel — send clean close frame and exit.
 				_ = c.conn.WriteMessage(gorillaws.CloseMessage, []byte{})
 				return
 			}
