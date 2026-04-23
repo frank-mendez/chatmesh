@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"log"
 	"net/http"
 	"os"
@@ -44,12 +45,14 @@ func main() {
 		}
 		defer r.Close()
 		go func() {
-			if err := r.Run(ctx); err != nil && err != context.Canceled {
+			if err := r.Run(ctx); err != nil &&
+				!errors.Is(err, context.Canceled) &&
+				!errors.Is(err, context.DeadlineExceeded) {
 				log.Printf("relay: %v", err)
 			}
 		}()
 		broadcaster = r
-		log.Printf("relay: connected to %s", redisURL)
+		log.Printf("relay: starting with %s", redisURL)
 	}
 
 	http.HandleFunc("/ws", ws.Handler(h, broadcaster))
