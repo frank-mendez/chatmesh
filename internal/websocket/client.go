@@ -20,23 +20,31 @@ const (
 	sendBufSize    = 256
 )
 
-// Client represents one connected WebSocket user.
-type Client struct {
-	h    *hub.Hub
-	conn *gorillaws.Conn
-	send chan []byte
-	room string
-	user string
-	once sync.Once
+// Broadcaster routes outbound messages to room subscribers.
+// Both *hub.Hub and *relay.Relay satisfy this interface.
+type Broadcaster interface {
+	Broadcast(room string, payload []byte)
 }
 
-func newClient(h *hub.Hub, conn *gorillaws.Conn, room, user string) *Client {
+// Client represents one connected WebSocket user.
+type Client struct {
+	hub         *hub.Hub    // register/unregister only
+	broadcaster Broadcaster // message routing (local hub or Redis relay)
+	conn        *gorillaws.Conn
+	send        chan []byte
+	room        string
+	user        string
+	once        sync.Once
+}
+
+func newClient(h *hub.Hub, b Broadcaster, conn *gorillaws.Conn, room, user string) *Client {
 	return &Client{
-		h:    h,
-		conn: conn,
-		send: make(chan []byte, sendBufSize),
-		room: room,
-		user: user,
+		hub:         h,
+		broadcaster: b,
+		conn:        conn,
+		send:        make(chan []byte, sendBufSize),
+		room:        room,
+		user:        user,
 	}
 }
 
@@ -54,11 +62,11 @@ func (c *Client) Close() {
 	c.once.Do(func() { close(c.send) })
 }
 
-// ReadLoop reads from the WebSocket and forwards validated messages to the hub.
+// ReadLoop reads from the WebSocket and forwards validated messages to the broadcaster.
 // It is the only goroutine that reads from c.conn.
 func (c *Client) ReadLoop() {
 	defer func() {
-		c.h.Unregister(c, c.room)
+		c.hub.Unregister(c, c.room)
 		c.conn.Close()
 	}()
 
@@ -68,7 +76,7 @@ func (c *Client) ReadLoop() {
 		return c.conn.SetReadDeadline(time.Now().Add(pongWait))
 	})
 
-	c.h.Register(c, c.room)
+	c.hub.Register(c, c.room)
 
 	for {
 		_, raw, err := c.conn.ReadMessage()
@@ -99,7 +107,7 @@ func (c *Client) ReadLoop() {
 			continue
 		}
 
-		c.h.Broadcast(c.room, payload)
+		c.broadcaster.Broadcast(c.room, payload)
 	}
 }
 
@@ -117,7 +125,6 @@ func (c *Client) WriteLoop() {
 		case payload, ok := <-c.send:
 			_ = c.conn.SetWriteDeadline(time.Now().Add(writeWait))
 			if !ok {
-				// Hub closed the channel — send clean close frame and exit.
 				_ = c.conn.WriteMessage(gorillaws.CloseMessage, []byte{})
 				return
 			}
