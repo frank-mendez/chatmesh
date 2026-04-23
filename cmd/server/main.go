@@ -1,12 +1,16 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/frank-mendez/chatmesh/internal/hub"
+	"github.com/frank-mendez/chatmesh/internal/relay"
 	ws "github.com/frank-mendez/chatmesh/internal/websocket"
 )
 
@@ -25,10 +29,30 @@ func main() {
 	}
 	log.SetPrefix("[" + serverID + "] ")
 
+	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer cancel()
+
 	h := hub.New()
 	go h.Run()
 
-	http.HandleFunc("/ws", ws.Handler(h))
+	var broadcaster ws.Broadcaster = h
+
+	if redisURL := os.Getenv("REDIS_URL"); redisURL != "" {
+		r, err := relay.New(h, redisURL)
+		if err != nil {
+			log.Fatalf("relay: %v", err)
+		}
+		defer r.Close()
+		go func() {
+			if err := r.Run(ctx); err != nil && err != context.Canceled {
+				log.Printf("relay: %v", err)
+			}
+		}()
+		broadcaster = r
+		log.Printf("relay: connected to %s", redisURL)
+	}
+
+	http.HandleFunc("/ws", ws.Handler(h, broadcaster))
 	http.HandleFunc("/instance", instanceHandler(serverID))
 
 	log.Println("chatmesh listening on :8080")
