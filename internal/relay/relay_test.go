@@ -1,7 +1,6 @@
 package relay_test
 
 import (
-	"context"
 	"encoding/json"
 	"testing"
 	"time"
@@ -14,7 +13,7 @@ import (
 type sub struct{ got [][]byte }
 
 func (s *sub) Deliver(p []byte) { s.got = append(s.got, p) }
-func (s *sub) Close()           {}
+func (s *sub) Close() {} // no-op: test subscriber does not need cleanup
 
 func TestRelayDeliversToHub(t *testing.T) {
 	mr := miniredis.RunT(t)
@@ -32,9 +31,7 @@ func TestRelayDeliversToHub(t *testing.T) {
 	}
 	defer r.Close()
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	go r.Run(ctx) //nolint:errcheck
+	go r.Run(t.Context()) //nolint:errcheck
 
 	time.Sleep(50 * time.Millisecond) // let subscription start
 
@@ -77,9 +74,7 @@ func TestRelayRoomIsolation(t *testing.T) {
 	}
 	defer r.Close()
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	go r.Run(ctx) //nolint:errcheck
+	go r.Run(t.Context()) //nolint:errcheck
 
 	time.Sleep(50 * time.Millisecond)
 

@@ -30,6 +30,8 @@ func New(h *hub.Hub, redisURL string) (*Relay, error) {
 
 // Broadcast publishes payload to Redis. Run() picks it up on every instance
 // and delivers it to the local hub.
+// The room parameter is unused here; room routing is performed by the hub,
+// which reads the "room" field from the JSON payload directly.
 func (r *Relay) Broadcast(room string, payload []byte) {
 	if err := r.client.Publish(context.Background(), channel, payload).Err(); err != nil {
 		log.Printf("relay: publish room=%q: %v", room, err)
