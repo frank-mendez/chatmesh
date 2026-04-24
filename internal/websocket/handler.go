@@ -19,11 +19,14 @@ var upgrader = gorillaws.Upgrader{
 // Handler returns an http.HandlerFunc that upgrades connections and starts
 // the per-client read/write goroutines.
 //
+// h handles register/unregister. b routes broadcast messages — pass the hub
+// directly (Phase 2) or a *relay.Relay (Phase 3+).
+//
 // Query params:
 //
 //	room — required, the room to join
 //	user — required, the display name
-func Handler(h *hub.Hub) http.HandlerFunc {
+func Handler(h *hub.Hub, b Broadcaster) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		room := r.URL.Query().Get("room")
 		user := r.URL.Query().Get("user")
@@ -38,7 +41,7 @@ func Handler(h *hub.Hub) http.HandlerFunc {
 			return
 		}
 
-		c := newClient(h, conn, room, user)
+		c := newClient(h, b, conn, room, user)
 		go c.WriteLoop()
 		go c.ReadLoop()
 	}
